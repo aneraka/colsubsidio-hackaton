@@ -1,1 +1,0 @@
-ALTER TABLE public.products ADD COLUMN max_stock numeric NULL;

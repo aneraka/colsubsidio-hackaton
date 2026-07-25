@@ -4,7 +4,7 @@
 *.pem
 *.key
 secrets.json
-auth.json
+auth.jsongt
 
 # Logs
 logs
