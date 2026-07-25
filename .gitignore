@@ -1,3 +1,11 @@
+# Nunca subas credenciales, tokens o contraseñas
+.env
+.env.*
+*.pem
+*.key
+secrets.json
+auth.json
+
 # Logs
 logs
 *.log
