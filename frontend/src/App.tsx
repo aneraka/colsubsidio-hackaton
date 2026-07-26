@@ -3,6 +3,7 @@ import { useEffect, type ReactNode } from 'react'
 import { TabletShell } from './components/layout/TabletShell'
 import { useSessionStore } from './store/useSessionStore'
 import { useSyncStore } from './store/useSyncStore'
+import { puedeGestionarUsuarios } from './lib/permisos'
 import { LoginScreen } from './screens/login/LoginScreen'
 import { InicioScreen } from './screens/inicio/InicioScreen'
 import { RegistrosScreen } from './screens/registros/RegistrosScreen'
@@ -21,6 +22,8 @@ import { ReporteScreen } from './screens/reporte/ReporteScreen'
 import { OfflineScreen } from './screens/offline/OfflineScreen'
 import { DevUIScreen } from './screens/dev/DevUIScreen'
 import { UsuariosScreen } from './screens/usuarios/UsuariosScreen'
+import { GestionBodegasScreen } from './screens/bodegas-admin/GestionBodegasScreen'
+import { GestionProductosScreen } from './screens/productos-admin/GestionProductosScreen'
 
 /** Ruta protegida: sin sesión → /login (excepto /dev/ui, que es herramienta de QA). */
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -28,6 +31,15 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation()
   if (!usuario) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+  return <>{children}</>
+}
+
+/** Solo admin/super_admin llegan a Gestión de usuarios; el resto va a /inicio. */
+function RequireGestionUsuarios({ children }: { children: ReactNode }) {
+  const usuario = useSessionStore((s) => s.usuario)
+  if (!puedeGestionarUsuarios(usuario)) {
+    return <Navigate to="/inicio" replace />
   }
   return <>{children}</>
 }
@@ -53,6 +65,8 @@ function App() {
 
         <Route path="/bodegas" element={<RequireAuth><BodegasScreen /></RequireAuth>} />
         <Route path="/bodegas/:bodegaId/zonas" element={<RequireAuth><ZonasScreen /></RequireAuth>} />
+        <Route path="/gestion-bodegas" element={<RequireAuth><GestionBodegasScreen /></RequireAuth>} />
+        <Route path="/gestion-productos" element={<RequireAuth><GestionProductosScreen /></RequireAuth>} />
 
         <Route path="/conteo/identificar" element={<RequireAuth><IdentificarScreen /></RequireAuth>} />
         {/* Escáner: sin guardia porque el login por carné lo abre antes de haber sesión */}
@@ -65,7 +79,16 @@ function App() {
         <Route path="/zona/progreso" element={<RequireAuth><ProgresoScreen /></RequireAuth>} />
         <Route path="/reporte" element={<RequireAuth><ReporteScreen /></RequireAuth>} />
         <Route path="/offline" element={<RequireAuth><OfflineScreen /></RequireAuth>} />
-        <Route path="/usuarios" element={<RequireAuth><UsuariosScreen /></RequireAuth>} />
+        <Route
+          path="/usuarios"
+          element={
+            <RequireAuth>
+              <RequireGestionUsuarios>
+                <UsuariosScreen />
+              </RequireGestionUsuarios>
+            </RequireAuth>
+          }
+        />
 
         {/* Galería del design system — accesible sin sesión para QA visual */}
         <Route path="/dev/ui" element={<DevUIScreen />} />

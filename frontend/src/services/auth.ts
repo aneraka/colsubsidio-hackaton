@@ -17,7 +17,7 @@ export async function loginConPin(correo: string, pin: string): Promise<Usuario 
 
   const { data: perfil, error: perfilError } = await supabase
     .from('profiles')
-    .select('id, email, role, full_name')
+    .select('id, email, role, full_name, carne')
     .eq('id', authData.user.id)
     .maybeSingle()
   if (perfilError || !perfil) return null
@@ -27,7 +27,7 @@ export async function loginConPin(correo: string, pin: string): Promise<Usuario 
     nombre: perfil.full_name ?? perfil.email,
     correo: perfil.email,
     pin,
-    carne: '',
+    carne: perfil.carne ?? '',
     rol: rolBackendAFrontend(perfil.role as RolBackend),
     rolBackend: perfil.role as RolBackend,
   }

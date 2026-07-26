@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UserPlus } from 'lucide-react'
+import { Search, UserPlus } from 'lucide-react'
 import { useSessionStore } from '../../store/useSessionStore'
-import { puedeGestionarUsuarios } from '../../lib/permisos'
+import { puedeGestionarUsuarios, rolesGestionablesPor } from '../../lib/permisos'
+import { normalizar } from '../../lib/texto'
+import type { Usuario } from '../../types/domain'
 import {
   listarUsuarios,
   listarBodegasReales,
@@ -10,6 +12,7 @@ import {
   asignarBodegas,
   restablecerPin,
   crearUsuario,
+  actualizarPerfil,
   type UsuarioAdmin,
   type BodegaReal,
   type AsignacionRol,
@@ -31,6 +34,7 @@ export function UsuariosScreen() {
   const [usuarios, setUsuarios] = useState<UsuarioAdmin[] | null>(null)
   const [seleccionado, setSeleccionado] = useState<UsuarioAdmin | null>(null)
   const [crearAbierto, setCrearAbierto] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
 
   const cargar = () => {
     listarUsuarios().then(setUsuarios)
@@ -39,6 +43,13 @@ export function UsuariosScreen() {
   useEffect(() => {
     cargar()
   }, [])
+
+  const filtrados = useMemo(() => {
+    if (!usuarios) return null
+    const q = normalizar(busqueda)
+    if (!q) return usuarios
+    return usuarios.filter((u) => normalizar(u.nombre).includes(q) || normalizar(u.correo).includes(q))
+  }, [usuarios, busqueda])
 
   if (!puedeGestionarUsuarios(usuario)) {
     navigate('/inicio')
@@ -59,6 +70,19 @@ export function UsuariosScreen() {
       />
 
       <div className="mx-auto w-full max-w-[900px] flex-1 overflow-y-auto p-6">
+        <div className="relative mb-4">
+          <Search
+            size={20}
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[color:var(--color-graphite-60)]"
+          />
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre o correo…"
+            className="h-14 w-full rounded-xl border border-[#D8D9DD] bg-white pl-12 pr-4 text-lg outline-none focus:border-[color:var(--color-brand-blue)]"
+          />
+        </div>
+
         {usuarios === null ? (
           <div className="flex flex-col gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -67,7 +91,7 @@ export function UsuariosScreen() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {usuarios.map((u) => (
+            {(filtrados ?? []).map((u) => (
               <ListRow
                 key={u.id}
                 title={u.nombre}
@@ -84,10 +108,13 @@ export function UsuariosScreen() {
         )}
       </div>
 
-      {seleccionado && <DetalleUsuarioDialog usuario={seleccionado} onClose={() => setSeleccionado(null)} />}
+      {seleccionado && (
+        <DetalleUsuarioDialog usuario={seleccionado} onClose={() => setSeleccionado(null)} onActualizado={cargar} />
+      )}
 
       {crearAbierto && (
         <CrearUsuarioDialog
+          usuarioActual={usuario}
           onClose={() => setCrearAbierto(false)}
           onCreado={() => {
             setCrearAbierto(false)
@@ -99,7 +126,20 @@ export function UsuariosScreen() {
   )
 }
 
-function DetalleUsuarioDialog({ usuario, onClose }: { usuario: UsuarioAdmin; onClose: () => void }) {
+function DetalleUsuarioDialog({
+  usuario,
+  onClose,
+  onActualizado,
+}: {
+  usuario: UsuarioAdmin
+  onClose: () => void
+  onActualizado: () => void
+}) {
+  const [nombre, setNombre] = useState(usuario.nombre)
+  const [carneInput, setCarneInput] = useState(usuario.carne ?? '')
+  const [datosMsg, setDatosMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
+  const [guardandoDatos, setGuardandoDatos] = useState(false)
+
   const [pin, setPin] = useState('')
   const [pinMsg, setPinMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
   const [guardandoPin, setGuardandoPin] = useState(false)
@@ -126,6 +166,23 @@ function DetalleUsuarioDialog({ usuario, onClose }: { usuario: UsuarioAdmin; onC
       cancelado = true
     }
   }, [usuario.id, esOperario])
+
+  const guardarDatos = async () => {
+    if (!nombre.trim()) {
+      setDatosMsg({ tipo: 'error', texto: 'El nombre no puede estar vacío' })
+      return
+    }
+    setGuardandoDatos(true)
+    try {
+      await actualizarPerfil(usuario.id, { nombre: nombre.trim(), carne: carneInput.trim() || null })
+      setDatosMsg({ tipo: 'ok', texto: 'Datos actualizados' })
+      onActualizado()
+    } catch (e) {
+      setDatosMsg({ tipo: 'error', texto: e instanceof Error ? e.message : 'No se pudo actualizar' })
+    } finally {
+      setGuardandoDatos(false)
+    }
+  }
 
   const guardarPin = async () => {
     if (!/^\d{6}$/.test(pin)) {
@@ -171,6 +228,34 @@ function DetalleUsuarioDialog({ usuario, onClose }: { usuario: UsuarioAdmin; onC
         <p className="text-[color:var(--color-graphite-60)]">
           {usuario.correo} · {ROL_LABEL[usuario.rolBackend]}
         </p>
+
+        <div className="mt-6">
+          <h3 className="mb-2 font-bold text-[color:var(--color-graphite)]">Datos del usuario</h3>
+          <div className="flex flex-col gap-3">
+            <input
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Nombre"
+              className="h-14 rounded-xl border border-[#D8D9DD] bg-white px-4 text-lg outline-none focus:border-[color:var(--color-brand-blue)]"
+            />
+            <input
+              value={carneInput}
+              onChange={(e) => setCarneInput(e.target.value)}
+              placeholder="Carné (código de barras, opcional)"
+              className="h-14 rounded-xl border border-[#D8D9DD] bg-white px-4 text-lg outline-none focus:border-[color:var(--color-brand-blue)]"
+            />
+            <BigButton variant="blue" size="md" disabled={guardandoDatos} onClick={guardarDatos}>
+              Guardar
+            </BigButton>
+          </div>
+          {datosMsg && (
+            <p
+              className={`mt-2 text-sm font-semibold ${datosMsg.tipo === 'ok' ? 'text-[color:var(--color-success)]' : 'text-[color:var(--color-danger)]'}`}
+            >
+              {datosMsg.texto}
+            </p>
+          )}
+        </div>
 
         <div className="mt-6">
           <h3 className="mb-2 font-bold text-[color:var(--color-graphite)]">Restablecer PIN</h3>
@@ -221,7 +306,7 @@ function DetalleUsuarioDialog({ usuario, onClose }: { usuario: UsuarioAdmin; onC
                               : { background: '#ECEDF0', color: 'var(--color-graphite-60)' }
                           }
                         >
-                          {rol === 'principal' ? 'Principal' : 'Revisor'}
+                          {rol === 'principal' ? 'Principal' : 'Secundario'}
                         </button>
                       ))}
                     </div>
@@ -256,11 +341,21 @@ function DetalleUsuarioDialog({ usuario, onClose }: { usuario: UsuarioAdmin; onC
   )
 }
 
-function CrearUsuarioDialog({ onClose, onCreado }: { onClose: () => void; onCreado: () => void }) {
+function CrearUsuarioDialog({
+  usuarioActual,
+  onClose,
+  onCreado,
+}: {
+  usuarioActual: Usuario | null
+  onClose: () => void
+  onCreado: () => void
+}) {
+  const opcionesRol = rolesGestionablesPor(usuarioActual)
   const [correo, setCorreo] = useState('')
   const [nombre, setNombre] = useState('')
   const [pin, setPin] = useState('')
-  const [rol, setRol] = useState<'operario' | 'admin' | 'super_admin'>('operario')
+  const [carne, setCarne] = useState('')
+  const [rol, setRol] = useState<RolBackend>(opcionesRol[0] ?? 'operario')
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
 
@@ -272,7 +367,7 @@ function CrearUsuarioDialog({ onClose, onCreado }: { onClose: () => void; onCrea
     setGuardando(true)
     setError('')
     try {
-      await crearUsuario(correo.trim().toLowerCase(), pin, rol, nombre.trim())
+      await crearUsuario(correo.trim().toLowerCase(), pin, rol, nombre.trim(), carne.trim() || undefined)
       onCreado()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo crear el usuario')
@@ -304,8 +399,14 @@ function CrearUsuarioDialog({ onClose, onCreado }: { onClose: () => void; onCrea
             placeholder="PIN inicial (6 dígitos)"
             className="h-14 rounded-xl border border-[#D8D9DD] bg-white px-4 text-lg outline-none focus:border-[color:var(--color-brand-blue)]"
           />
+          <input
+            value={carne}
+            onChange={(e) => setCarne(e.target.value)}
+            placeholder="Carné (código de barras, opcional)"
+            className="h-14 rounded-xl border border-[#D8D9DD] bg-white px-4 text-lg outline-none focus:border-[color:var(--color-brand-blue)]"
+          />
           <div className="flex gap-2">
-            {(['operario', 'admin', 'super_admin'] as const).map((r) => (
+            {opcionesRol.map((r) => (
               <button
                 key={r}
                 onClick={() => setRol(r)}

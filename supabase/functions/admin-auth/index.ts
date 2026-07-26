@@ -8,7 +8,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-type Role = "super_admin" | "admin" | "operario";
+type Role = "super_admin" | "admin" | "operario" | "lider";
+const VALID_ROLES: Role[] = ["super_admin", "admin", "operario", "lider"];
 
 interface RequestBody {
   action: "createUser" | "deleteUser" | "updateUserPassword";
@@ -57,15 +58,22 @@ Deno.serve(async (req) => {
     const { action, payload } = body;
 
     if (action === "createUser") {
-      const { email, password, role, fullName } = payload as {
+      const { email, password, role, fullName, carne } = payload as {
         email: string;
         password: string;
         role: Role;
         fullName?: string;
+        carne?: string;
       };
       if (!email || !password || !role) return json({ error: "Datos incompletos" }, 400);
       if (!/^\d{6}$/.test(password)) {
         return json({ error: "El PIN debe tener exactamente 6 dígitos" }, 400);
+      }
+      if (!VALID_ROLES.includes(role)) {
+        return json({ error: "Rol inválido" }, 400);
+      }
+      if (profile.role === "admin" && (role === "admin" || role === "super_admin")) {
+        return json({ error: "Un admin no puede crear usuarios admin o super_admin" }, 403);
       }
 
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -80,10 +88,16 @@ Deno.serve(async (req) => {
       // Upsert profile with role (in case a trigger already created a default profile)
       const { error: upsertErr } = await admin
         .from("profiles")
-        .upsert({ id: created.user.id, email, role, full_name: fullName ?? null }, { onConflict: "id" });
+        .upsert(
+          { id: created.user.id, email, role, full_name: fullName ?? null, carne: carne || null },
+          { onConflict: "id" },
+        );
       if (upsertErr) {
         // Best effort rollback
         await admin.auth.admin.deleteUser(created.user.id);
+        if (upsertErr.code === "23505") {
+          return json({ error: "Ese carné ya está asignado a otro usuario" }, 400);
+        }
         return json({ error: upsertErr.message }, 400);
       }
 
@@ -111,6 +125,17 @@ Deno.serve(async (req) => {
       if (!userId || !password) return json({ error: "Datos incompletos" }, 400);
       if (!/^\d{6}$/.test(password)) {
         return json({ error: "El PIN debe tener exactamente 6 dígitos" }, 400);
+      }
+
+      if (profile.role === "admin") {
+        const { data: targetProfile } = await admin
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .maybeSingle();
+        if (targetProfile && ["admin", "super_admin"].includes(targetProfile.role)) {
+          return json({ error: "No puedes restablecer el PIN de un admin o super_admin" }, 403);
+        }
       }
 
       const { error: updErr } = await admin.auth.admin.updateUserById(userId, { password });

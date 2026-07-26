@@ -2,6 +2,7 @@ import type { Bodega, Producto, Zona } from '../types/domain'
 import { BODEGAS } from '../data/mock/bodegas'
 import { getZonasDeBodega } from '../data/mock/zonas'
 import { PRODUCTOS, getProductosDeZona as getProductosDeZonaMock } from '../data/mock/productos'
+import { normalizar } from '../lib/texto'
 
 /**
  * Catálogo — hoy resuelve desde mock con latencia simulada.
@@ -34,16 +35,6 @@ export function getPorCodigo(nrArticulo: string): Promise<Producto | null> {
 }
 
 // ---------- Búsqueda fuzzy propia (sin librerías) ----------
-
-function normalizar(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
 
 function score(query: string, producto: Producto, zonaActual?: string): number {
   const q = normalizar(query)

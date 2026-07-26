@@ -1,12 +1,38 @@
 # CONEXIÓN DEL BACKEND — Agente de Inventario
 
-La UI ya funciona 100% con datos mock y el parser local. Este documento explica cómo
-enchufar **Gemini** (IA) y **Supabase** (backend) sin tocar las pantallas: solo se editan
-servicios cuya interfaz TypeScript NO cambia.
+> Reescrito para reflejar el esquema **real** que corre en el proyecto Supabase hosted
+> (`inventario`, ref `hfxayiwctnphcvsgoqaf`). La versión anterior de este documento describía
+> un esquema (`bodegas`, `zonas`, `catalogo_items`, `historico`, `barcodes`, `alias`,
+> `sesiones_conteo`, `capturas`) que nunca se creó — quedó como diseño de referencia mientras el
+> proyecto migraba a Supabase de verdad. Este documento ya no lo usa.
 
 ---
 
-## 1. Gemini (2 minutos, sin tocar código)
+## 0. Estado actual (resumen)
+
+El proyecto **ya apunta a producción** (`frontend/.env` → `VITE_SUPABASE_URL=https://hfxayiwctnphcvsgoqaf.supabase.co`).
+Login, gestión de usuarios y asignación de bodegas están conectados de verdad. El flujo de
+conteo (catálogo, capturas, código de barras, ciclos, alertas) todavía vive en mock/localStorage
+porque el esquema real no tenía zonas, histórico, sesiones ni la trazabilidad de captura —
+la migración `20260726060000_conteo_zonas_sesiones_alertas.sql` cierra ese hueco de forma
+aditiva (no borra ni renombra nada existente).
+
+| Servicio/store | Estado | Tablas reales que usa (hoy o tras la migración) |
+|---|---|---|
+| `services/auth.ts` | ✅ Conectado | `profiles` (vía Supabase Auth) |
+| `services/usuarios.ts` | ✅ Conectado | `profiles`, `warehouse_operators`, `warehouses`, edge function `admin-auth` |
+| `services/catalog.ts` | ❌ Mock | → `warehouses`, `zones`, `products`, `warehouse_products` |
+| `services/captures.ts` | ❌ localStorage | → `inventory_logs` (+ `count_sessions`) |
+| `services/barcode.ts` | ❌ Mock + localStorage | → `product_barcodes` |
+| `store/useCyclesStore.ts` | ❌ localStorage | → `count_sessions` |
+| `store/useAlertsStore.ts` | ❌ localStorage | → `alerts` |
+| `store/useSyncStore.ts` | ❌ simulado (`setTimeout`) | → insert masivo en `inventory_logs`/`alerts` |
+| `screens/conteo/DesambiguarScreen.tsx` | ❌ no aprende | → `product_aliases` |
+| `services/exportExcel.ts` | ✅ real (función pura) | ninguna — arma el Excel desde lo que reciba |
+
+---
+
+## 1. Gemini (sin cambios, no depende de Supabase)
 
 El agente ya tiene el `fetch` real escrito en `src/services/ai/gemini.ts`. Solo falta la key.
 
@@ -18,160 +44,121 @@ El agente ya tiene el `fetch` real escrito en `src/services/ai/gemini.ts`. Solo 
    ```
 3. Reinicia el dev server (`Ctrl+C` y `npm run dev`). Vite solo lee `.env` al arrancar.
 4. Verifica: abre la consola del navegador. Con key **desaparece** el mensaje
-   `[gemini] sin API key — usando parser local`. En `/dev/ui`, la sección "Servicios"
-   muestra el badge **"Gemini activo"**.
+   `[gemini] sin API key — usando parser local`.
 
-> Sin key la demo sigue funcionando con `localParser.ts` (regex). Con key, Gemini interpreta
-> frases más complejas y el parser local queda como fallback silencioso ante timeouts (4 s).
+> Sin key la demo sigue funcionando con `localParser.ts` (regex).
 
 ---
 
-## 2. Supabase (backend real)
+## 2. Supabase — esquema real (producción)
 
 ### 2.1 Variables de entorno
 
-En `.env`:
+Ya configuradas en `frontend/.env`:
 ```
-VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...anon_key
-```
-
-Instala el cliente:
-```
-npm install @supabase/supabase-js
-```
-Crea `src/services/supabase.ts`:
-```ts
-import { createClient } from '@supabase/supabase-js'
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_ANON_KEY!,
-)
+VITE_SUPABASE_URL=https://hfxayiwctnphcvsgoqaf.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon key del proyecto "inventario">
 ```
 
-### 2.2 Esquema SQL (deriva de `src/types/domain.ts`)
+`src/services/supabase.ts` ya crea el cliente con estas variables — no requiere cambios.
 
-Ejecuta en el SQL Editor de Supabase:
+### 2.2 Tablas ya existentes (`supabase/migrations/20260726031234_initial_schema.sql` y siguientes)
 
-```sql
-create table bodegas (
-  id text primary key,
-  nombre text not null,
-  nombre_corto text not null,
-  total_articulos int not null default 0
-);
-
-create table zonas (
-  id text primary key,
-  bodega_id text not null references bodegas(id),
-  nombre text not null,
-  orden int not null default 0
-);
-
-create table catalogo_items (
-  id text primary key,
-  nr_articulo text,                 -- nullable: 260 artículos reales sin código
-  nombre text not null,
-  unidad text not null check (unidad in ('Unidad','Kilogram','Liter')),
-  bodega_id text not null references bodegas(id),
-  zona_id text not null references zonas(id),
-  orden_ruta int not null default 0,
-  sd numeric not null default 0     -- teórico del sistema (NUNCA se muestra al operario)
-);
-
-create table historico (
-  producto_id text not null references catalogo_items(id),
-  periodo date not null,
-  existencia numeric not null,
-  primary key (producto_id, periodo)
-);
-
-create table barcodes (
-  ean text primary key,
-  producto_id text not null references catalogo_items(id)
-);
-
-create table alias (                -- jerga → producto (aprendizaje de desambiguación)
-  termino text not null,
-  producto_id text not null references catalogo_items(id),
-  primary key (termino, producto_id)
-);
-
-create table sesiones_conteo (
-  id text primary key,
-  bodega_id text not null references bodegas(id),
-  operario_id text not null,
-  operario_nombre text not null,
-  fecha_ciclo text not null,
-  iniciada_en timestamptz not null default now()
-);
-
-create table capturas (
-  id text primary key,
-  producto_id text not null references catalogo_items(id),
-  bodega_id text not null references bodegas(id),
-  zona_id text not null references zonas(id),
-  sesion_id text not null references sesiones_conteo(id),
-  operario_id text not null,
-  cantidad numeric not null check (cantidad >= 0),   -- nunca negativos
-  unidad text not null,
-  metodo_identificacion text not null,
-  metodo_captura text not null,
-  expresion text,
-  frase_original text,
-  confianza numeric,
-  es_novedad boolean not null default false,
-  timestamp timestamptz not null default now()
-);
-
--- RLS: cada operario solo ve/inserta sus propias capturas
-alter table capturas enable row level security;
-create policy capturas_por_operario on capturas
-  for all using (operario_id = auth.uid()::text)
-  with check (operario_id = auth.uid()::text);
+```
+sites               -- sedes (Piscilago, etc.), cada una con un líder (profiles.role = 'lider')
+warehouses          -- bodegas dentro de una sede (slug las mapea a los IDs mock: 'b-almacen-sumin', etc.)
+warehouse_operators -- operarios asignados a bodegas (assignment_role: principal | revisor)
+categories          -- categorías de producto
+products            -- catálogo (name, unit, cost_per_unit, sku, codigo_barras, category_id)
+warehouse_products  -- stock por bodega+producto (current_stock, min_stock, max_stock)
+inventory_logs      -- movimientos (entrada | salida | conteo_manual), dispara update de stock
+profiles            -- perfiles (role: super_admin | admin | operario | lider)
+audit_logs          -- auditoría automática (trigger en cada tabla de negocio)
 ```
 
-### 2.3 Puntos de conexión — `// TODO(backend):` archivo por archivo
+RLS activo en todas: `admin`/`super_admin` ven todo; `lider` ve su sede (`get_active_site_id()`);
+`operario` ve solo sus bodegas asignadas (`is_operator_of_warehouse()`).
 
-Cada servicio ya tiene la interfaz final; solo se reemplaza el cuerpo mock por la query.
-**Las pantallas no se tocan.**
+### 2.3 Tablas nuevas (`supabase/migrations/20260726060000_conteo_zonas_sesiones_alertas.sql`)
 
-| Archivo | Línea | Función | Reemplazo |
+Migración **aditiva** — no toca ninguna tabla/columna existente, solo agrega:
+
+```
+zones                            -- zonas dentro de una bodega (name, order) — ruta guiada
+warehouse_products.zone_id       -- + route_order (columnas nuevas en tabla existente)
+warehouse_product_stock_history  -- existencia por mes (warehouse_id, product_id, period, stock)
+product_barcodes                 -- EAN -> product_id (N:1; complementa products.codigo_barras)
+count_sessions                   -- sesión/ciclo de conteo (operario, bodega, fecha_ciclo, estado, resumen jsonb)
+inventory_logs.count_session_id  -- + zone_id, identification_method, capture_method,
+                                  --   expression, original_phrase, confidence, is_novelty
+product_aliases                  -- jerga -> producto (aprendizaje de desambiguación)
+alerts                           -- atipico | decimal | sd_negativo, con reviewed/reviewed_by
+```
+
+Mismos triggers de auditoría (`audit.log_change()`) y mismo patrón de RLS que las tablas existentes.
+
+### 2.4 Aplicar la migración al proyecto hosted
+
+El proyecto ya está enlazado (`supabase/.temp/linked-project.json` → ref `hfxayiwctnphcvsgoqaf`).
+Desde la raíz del repo, con la contraseña de la base de datos del proyecto **inventario**:
+
+```bash
+supabase db push
+```
+
+Esto aplica únicamente las migraciones nuevas que el proyecto remoto no tiene todavía (las 3
+migraciones existentes ya están aplicadas). Revisa el diff que muestra el CLI antes de confirmar.
+
+> No se incluye ningún paso que ejecute esto automáticamente: aplicar cambios de esquema a la
+> base de producción requiere confirmación explícita y la contraseña de la base de datos, que
+> solo el dueño del proyecto debe introducir.
+
+### 2.5 Puntos de conexión — `// TODO(backend):` archivo por archivo
+
+Cada servicio ya tiene la interfaz final; solo se reemplaza el cuerpo mock por la query contra
+las tablas reales. **Las pantallas no se tocan.**
+
+| Archivo | Línea | Función | Reemplazo (esquema real) |
 |---|---|---|---|
-| `src/services/catalog.ts` | 15 | `getBodegas()` | `supabase.from('bodegas').select()` |
-| `src/services/catalog.ts` | 20 | `getZonas(bodegaId)` | `.from('zonas').select().eq('bodega_id', bodegaId).order('orden')` |
-| `src/services/catalog.ts` | 25 | `getProductosDeZona(zonaId)` | `.from('catalogo_items').select().eq('zona_id', zonaId).order('orden_ruta')` |
-| `src/services/catalog.ts` | 30 | `getPorCodigo(nr)` | `.from('catalogo_items').select().eq('nr_articulo', nr).maybeSingle()` |
-| `src/services/catalog.ts` | 69 | `buscarPorNombre(q)` | full-text: `.textSearch('nombre', q, { type: 'websearch' })` o RPC con `websearch_to_tsquery` |
-| `src/services/captures.ts` | 25 | `guardarCaptura(c)` | `.from('capturas').insert(mapCaptura(c))` (RLS aplica por operario) |
-| `src/services/captures.ts` | 36 | `getCapturasSesion(id)` | `.from('capturas').select().eq('sesion_id', id)` |
-| `src/services/barcode.ts` | 26 | `resolverBarcode(ean)` | `.from('barcodes').select('producto_id').eq('ean', ean).maybeSingle()` |
-| `src/services/barcode.ts` | 33 | `enrolarBarcode(ean, id)` | `.from('barcodes').upsert({ ean, producto_id: id })` |
-| `src/store/useSyncStore.ts` | 27 | `sincronizar()` | `flush`: `insert` masivo de las capturas encoladas y vaciar la cola |
-| `src/store/useCountingStore.ts` | 71 | `registrarCaptura` | mantener `guardarCaptura` (ya llama al servicio) + encolar para sync |
-| `src/screens/conteo/DesambiguarScreen.tsx` | 24 | `elegir(p)` | `TODO(alias)`: `insert` en `alias` (termino→producto) para aprender jerga |
-| `src/screens/conteo/EscanearScreen.tsx` | 51 | modo carné | mapear el código del carné → `operario_id` real |
+| `src/services/catalog.ts` | 15 | `getBodegas()` | `.from('warehouses').select()` |
+| `src/services/catalog.ts` | 20 | `getZonas(bodegaId)` | `.from('zones').select().eq('warehouse_id', bodegaId).order('order')` |
+| `src/services/catalog.ts` | 25 | `getProductosDeZona(zonaId)` | `.from('warehouse_products').select('*, products(*)').eq('zone_id', zonaId).order('route_order')` |
+| `src/services/catalog.ts` | 30 | `getPorCodigo(nr)` | `.from('products').select().eq('sku', nr).maybeSingle()` |
+| `src/services/catalog.ts` | 69 | `buscarPorNombre(q)` | full-text: `.textSearch('name', q, { type: 'websearch' })` sobre `products`, o RPC con `websearch_to_tsquery` |
+| `src/services/captures.ts` | 25 | `guardarCaptura(c)` | `.from('inventory_logs').insert({ type: 'conteo_manual', ...mapCaptura(c) })` (RLS aplica por operario/bodega) |
+| `src/services/captures.ts` | 36 | `getCapturasSesion(id)` | `.from('inventory_logs').select().eq('count_session_id', id)` |
+| `src/services/barcode.ts` | 26 | `resolverBarcode(ean)` | `.from('product_barcodes').select('product_id').eq('ean', ean).maybeSingle()` |
+| `src/services/barcode.ts` | 33 | `enrolarBarcode(ean, id)` | `.from('product_barcodes').upsert({ ean, product_id: id })` |
+| `src/store/useCyclesStore.ts` | 41 | `cerrarCiclo()` | `.from('count_sessions').update({ status: 'cerrado', summary, closed_at, closed_by })` |
+| `src/store/useAlertsStore.ts` | 4 | estado de revisión | `.from('alerts').update({ reviewed: true, reviewed_by, reviewed_at })` en vez de guardar solo el ID localmente |
+| `src/store/useSyncStore.ts` | 27 | `sincronizar()` | `flush`: `insert` masivo de las capturas/alertas encoladas (`inventory_logs`, `alerts`) y vaciar la cola |
+| `src/store/useCountingStore.ts` | 81 | `registrarCaptura` | mantener `guardarCaptura` (ya llama al servicio) + encolar para sync |
+| `src/screens/conteo/DesambiguarScreen.tsx` | 24 | `elegir(p)` | `insert` en `product_aliases` (term→product_id) para aprender jerga |
 
 > **`getReporteSesion` no requiere query nueva**: es una función pura (`construirReporte`) que
-> une capturas con el catálogo. Con capturas reales, funciona igual.
+> une capturas con el catálogo. Con capturas reales desde `inventory_logs`, funciona igual.
+
+> El histórico para la banda de anomalía (`referenciaHistorica` en `lib/validation.ts`) pasa de
+> leer `producto.historico[]` en memoria a un `select` sobre `warehouse_product_stock_history`
+> ordenado por `period desc limit N`.
 
 ---
 
 ## 3. Carga del insumo real (`BODEGAS Y STOCK.xlsx` → Supabase)
 
 SheetJS (`xlsx`) ya está instalado. Script de importación sugerido (`scripts/importar.ts`,
-ejecutable con `tsx`):
+ejecutable con `tsx`), contra el **esquema real**:
 
 1. `XLSX.readFile('BODEGAS Y STOCK.xlsx')`.
-2. **Una hoja por bodega** → fila en `bodegas` (nombre de hoja = `nombre`).
-3. Por cada fila de cada hoja, mapea columnas → `catalogo_items`:
-   - `Nr.Artículo` → `nr_articulo` (vacío → `null`)
-   - `Artículo` → `nombre`
-   - `Unidad` → `unidad` (`Unidad` / `Kilogram` / `Liter`)
-   - `SD` → `sd` (el teórico; puede ser negativo → va al reporte de reconciliación)
-   - Deriva `zona_id` y `orden_ruta` del orden físico de la hoja.
-4. `supabase.from('bodegas').upsert(...)` y luego `catalogo_items` en lotes de ~500.
-5. Histórico de meses previos → tabla `historico` (para las bandas de anomalía).
+2. **Una hoja por bodega** → fila en `warehouses` (si no existe ya vía `slug`).
+3. Por cada fila de cada hoja, mapea columnas → `products` + `warehouse_products`:
+   - `Nr.Artículo` → `products.sku` (vacío → `null`, hay ~260 artículos reales sin código)
+   - `Artículo` → `products.name`
+   - `Unidad` → `products.unit` (`Unidad` / `Kilogram` / `Liter`)
+   - `SD` → `warehouse_products.current_stock` (el teórico; puede ser negativo → alimenta `alerts` tipo `sd_negativo`)
+   - Deriva `zone_id` (crear/matchear en `zones`) y `route_order` del orden físico de la hoja.
+4. `supabase.from('warehouses').upsert(...)`, luego `products`/`warehouse_products` en lotes de ~500.
+5. Histórico de meses previos → `warehouse_product_stock_history` (una fila por mes/producto/bodega).
 
 ---
 
