@@ -3,19 +3,31 @@ import { useNavigate } from 'react-router-dom'
 import { Warehouse } from 'lucide-react'
 import type { Bodega } from '../../types/domain'
 import { getBodegas } from '../../services/catalog'
+import { getMisBodegasAsignadas } from '../../services/usuarios'
 import { getProductosDeBodega } from '../../data/mock/productos'
 import { useCountingStore } from '../../store/useCountingStore'
+import { useSessionStore } from '../../store/useSessionStore'
 import { fechaCicloTexto } from '../../lib/fecha'
 import { AppCard, Chip, ProgressRing, TopBar } from '../../components/ui'
 
 export function BodegasScreen() {
   const navigate = useNavigate()
+  const usuario = useSessionStore((s) => s.usuario)
   const [bodegas, setBodegas] = useState<Bodega[] | null>(null)
   const contadosEnBodega = useCountingStore((s) => s.contadosEnBodega)
   const capturas = useCountingStore((s) => s.capturas) // fuerza re-render al capturar
 
   useEffect(() => {
-    getBodegas().then(setBodegas)
+    getBodegas().then(async (todas) => {
+      if (usuario?.rolBackend !== 'operario') {
+        setBodegas(todas)
+        return
+      }
+      // El operario solo ve las bodegas que un admin le asignó (warehouse_operators, real).
+      const slugs = await getMisBodegasAsignadas(usuario.id)
+      setBodegas(todas.filter((b) => slugs.includes(b.id)))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

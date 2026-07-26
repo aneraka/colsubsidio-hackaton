@@ -60,13 +60,17 @@ export interface SesionConteo {
 
 export type Rol = 'contador' | 'auditor'
 
+/** Rol real del backend (Supabase `profiles.role`), antes de colapsarlo a `Rol` para la UI. */
+export type RolBackend = 'super_admin' | 'admin' | 'operario' | 'lider'
+
 export interface Usuario {
-  id: string // ID visible (ej. "OP-1042")
+  id: string // ID visible (ej. "OP-1042"); para login por PIN es el uuid real de profiles.id
   nombre: string
   correo: string // ej. "juan.perez@colsubsidio.com"
-  pin: string // 4 dígitos
+  pin: string // 6 dígitos
   carne: string // código de barras del carné (ej. "CARNE-1042")
   rol: Rol
+  rolBackend: RolBackend
 }
 
 export interface ResumenCiclo {

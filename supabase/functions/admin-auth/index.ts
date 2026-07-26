@@ -1,4 +1,4 @@
-// Admin auth edge function — only callable by super_admin
+// Admin auth edge function — only callable by admin or super_admin
 // Actions: createUser, deleteUser, updateUserPassword
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -49,20 +49,24 @@ Deno.serve(async (req) => {
       .select("role")
       .eq("id", userData.user.id)
       .maybeSingle();
-    if (profErr || profile?.role !== "super_admin") {
-      return json({ error: "Acceso denegado: solo super_admin" }, 403);
+    if (profErr || !profile || !["admin", "super_admin"].includes(profile.role)) {
+      return json({ error: "Acceso denegado: solo admin o super_admin" }, 403);
     }
 
     const body = (await req.json()) as RequestBody;
     const { action, payload } = body;
 
     if (action === "createUser") {
-      const { email, password, role } = payload as {
+      const { email, password, role, fullName } = payload as {
         email: string;
         password: string;
         role: Role;
+        fullName?: string;
       };
       if (!email || !password || !role) return json({ error: "Datos incompletos" }, 400);
+      if (!/^\d{6}$/.test(password)) {
+        return json({ error: "El PIN debe tener exactamente 6 dígitos" }, 400);
+      }
 
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email,
@@ -76,7 +80,7 @@ Deno.serve(async (req) => {
       // Upsert profile with role (in case a trigger already created a default profile)
       const { error: upsertErr } = await admin
         .from("profiles")
-        .upsert({ id: created.user.id, email, role }, { onConflict: "id" });
+        .upsert({ id: created.user.id, email, role, full_name: fullName ?? null }, { onConflict: "id" });
       if (upsertErr) {
         // Best effort rollback
         await admin.auth.admin.deleteUser(created.user.id);
@@ -105,7 +109,9 @@ Deno.serve(async (req) => {
     if (action === "updateUserPassword") {
       const { userId, password } = payload as { userId: string; password: string };
       if (!userId || !password) return json({ error: "Datos incompletos" }, 400);
-      if (password.length < 6) return json({ error: "La contraseña debe tener al menos 6 caracteres" }, 400);
+      if (!/^\d{6}$/.test(password)) {
+        return json({ error: "El PIN debe tener exactamente 6 dígitos" }, 400);
+      }
 
       const { error: updErr } = await admin.auth.admin.updateUserById(userId, { password });
       if (updErr) return json({ error: updErr.message }, 400);

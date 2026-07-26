@@ -1,58 +1,40 @@
-# MVP Inventario - Colsubsidio
+# Colsubsidio — Inventario
 
-Este es el repositorio del MVP de inventario, desarrollado con React, Vite, Tailwind CSS y Supabase.
+Este repo aloja el sistema de inventario de Colsubsidio (Piscilago). Layout actual:
 
-## 🛠 Prerrequisitos
+```
+.
+├── frontend/    # LA APP: "Agente de Inventario" — PWA para tablet (conteo físico por voz/escaneo)
+├── supabase/    # Backend compartido (Supabase): config, edge functions, migraciones
+└── legacy/
+    └── backoffice-lovable/   # App administrativa archivada (ver más abajo)
+```
 
-Para levantar este proyecto en tu máquina, necesitas tener instalado:
-* [Node.js](https://nodejs.org/) (o [Bun](https://bun.sh/))
-* [Docker Desktop](https://www.docker.com/products/docker-desktop/) (debe estar abierto y corriendo)
-* [Git](https://git-scm.com/)
+## Cómo correr
 
----
+Desde la raíz del repo:
+```bash
+npm install --prefix frontend   # solo la primera vez
+npm run dev                     # delega a frontend/, sirve en http://localhost:5121
+```
 
-## 🚀 Configuración del Entorno Local
+`npm run dev` en la raíz **siempre** levanta `frontend/` — es el único frontend activo del proyecto.
+Ver [`frontend/README.md`](frontend/README.md) para el detalle completo (pantallas, stack, PIN de demo, etc.)
+y [`frontend/docs/CONEXION-BACKEND.md`](frontend/docs/CONEXION-BACKEND.md) para la conexión a Supabase/Gemini.
 
-Sigue estos pasos para levantar el frontend y la base de datos local:
+## Backend (`supabase/`)
 
-### Paso 1: Instalar dependencias
-Abre la terminal en la raíz del proyecto y ejecuta:
-\`\`\`bash
-npm install
-# o si usas bun: bun install
-\`\`\`
+El backend vive en `supabase/` (Supabase CLI: `npx supabase start`, requiere Docker Desktop corriendo).
+El esquema está versionado en `supabase/migrations/` — `npx supabase db reset` lo reconstruye desde cero.
 
-### Paso 2: Configurar las variables de entorno
-1. Crea un archivo llamado \`.env\` en la raíz del proyecto.
-2. Copia y pega las siguientes variables (son las credenciales por defecto de Supabase local):
+## `legacy/backoffice-lovable/`
 
-\`\`\`env
-SUPABASE_PROJECT_ID="local"
-SUPABASE_URL="http://127.0.0.1:54321"
-SUPABASE_PUBLISHABLE_KEY="<AQUÍ_VA_LA_ANON_KEY_LOCAL>"
+App administrativa (gestión de productos/categorías/usuarios y roles) generada originalmente con Lovable,
+contra el mismo proyecto Supabase. Se retiró como frontend activo del proyecto: el entregable actual es
+`frontend/`. Se conserva por si hace falta consultar su código o reflotarla más adelante:
 
-VITE_SUPABASE_PROJECT_ID="local"
-VITE_SUPABASE_URL="http://127.0.0.1:54321"
-VITE_SUPABASE_PUBLISHABLE_KEY="<AQUÍ_VA_LA_ANON_KEY_LOCAL>"
-\`\`\`
-*(Nota: Obtendrás la clave \`ANON_KEY\` exacta al ejecutar el siguiente paso).*
-
-### Paso 3: Levantar la Base de Datos Local (Supabase)
-Inicia los contenedores de Docker con la CLI de Supabase:
-\`\`\`bash
-npx supabase start
-\`\`\`
-Al finalizar, la terminal te mostrará tus credenciales locales. Reemplaza el valor de \`SUPABASE_PUBLISHABLE_KEY\` y \`VITE_SUPABASE_PUBLISHABLE_KEY\` en tu archivo \`.env\` con la **anon key** que te arroje la terminal.
-
-Para asegurarte de tener las últimas tablas y estructura de la base de datos, ejecuta:
-\`\`\`bash
-npx supabase db reset
-\`\`\`
-
-### Paso 4: Levantar el servidor de desarrollo
-Finalmente, inicia la aplicación web:
-\`\`\`bash
+```bash
+cd legacy/backoffice-lovable
+npm install   # o bun install — ver bun.lock/bun.lockb
 npm run dev
-# o bun run dev
-\`\`\`
-Abre [http://localhost:8080](http://localhost:8080) (o el puerto que te indique Vite) en tu navegador.
+```

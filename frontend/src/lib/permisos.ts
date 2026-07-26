@@ -11,3 +11,7 @@ export const puedeExportar = (u: Usuario | null): boolean => esAuditor(u)
 export const puedeVerTeorico = (u: Usuario | null): boolean => esAuditor(u)
 export const recibeAlertas = (u: Usuario | null): boolean => esAuditor(u)
 export const puedeCerrarCiclo = (u: Usuario | null): boolean => esAuditor(u)
+
+/** Gestión de usuarios (PIN, bodegas a cargo, alta): solo admin/super_admin del backend real. */
+export const puedeGestionarUsuarios = (u: Usuario | null): boolean =>
+  u?.rolBackend === 'admin' || u?.rolBackend === 'super_admin'

@@ -5,9 +5,9 @@ digitación: el operario identifica el producto (ruta guiada / escaneo / código
 **cuenta por voz**, la app valida anomalías antes de guardar y genera un **Excel limpio** con
 las columnas exactas del ERP.
 
-> Estado: **UI completa + capa de servicios lista para conectar.** Funciona hoy con datos mock,
-> parser de voz local, export Excel real y modo offline. Gemini y Supabase se enchufan poniendo
-> las keys en `.env` (ver `docs/CONEXION-BACKEND.md`).
+> Estado: **UI completa + login y gestión de usuarios ya conectados a Supabase (hosted).** El resto
+> del catálogo (bodegas/zonas/productos/capturas) sigue con datos mock. Gemini se enchufa poniendo
+> la key en `.env` (ver `docs/CONEXION-BACKEND.md`).
 
 ## Stack
 
@@ -29,7 +29,20 @@ npm run test       # tests del parser de voz, validación, reporte y export Exce
 npm run lint       # oxlint
 ```
 
-La app abre en `/login`. PIN de demo: **1234** (Juan P.), **5678** (Sandra M.), **0000** (Admin).
+La app abre en `/login`. Usuarios de prueba (reales, contra Supabase — pestaña **PIN**, correo + PIN de
+6 dígitos):
+
+| Usuario | Correo | PIN | Rol |
+|---|---|---|---|
+| Juan P. | juan.perez@colsubsidio.com | `123456` | Operario |
+| Sandra M. | sandra.martinez@colsubsidio.com | `234567` | Operario |
+| Viviana R. | viviana.rojas@colsubsidio.com | `345678` | Admin |
+| Admin | admin@colsubsidio.com | `456789` | Super admin |
+| Roberto Díaz | lider.piscilago@colsubsidio.com | `567890` | Líder |
+
+Solo Admin y Viviana ven **Gestión de usuarios** (menú). Ahí se puede restablecer el PIN de cualquier
+usuario y asignar bodegas a cargo de un operario (Principal/Revisor) — un operario sin bodegas asignadas
+no ve ninguna en `/bodegas`.
 
 ## Probar en la tablet
 

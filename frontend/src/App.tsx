@@ -20,6 +20,7 @@ import { ProgresoScreen } from './screens/zona/ProgresoScreen'
 import { ReporteScreen } from './screens/reporte/ReporteScreen'
 import { OfflineScreen } from './screens/offline/OfflineScreen'
 import { DevUIScreen } from './screens/dev/DevUIScreen'
+import { UsuariosScreen } from './screens/usuarios/UsuariosScreen'
 
 /** Ruta protegida: sin sesión → /login (excepto /dev/ui, que es herramienta de QA). */
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -64,6 +65,7 @@ function App() {
         <Route path="/zona/progreso" element={<RequireAuth><ProgresoScreen /></RequireAuth>} />
         <Route path="/reporte" element={<RequireAuth><ReporteScreen /></RequireAuth>} />
         <Route path="/offline" element={<RequireAuth><OfflineScreen /></RequireAuth>} />
+        <Route path="/usuarios" element={<RequireAuth><UsuariosScreen /></RequireAuth>} />
 
         {/* Galería del design system — accesible sin sesión para QA visual */}
         <Route path="/dev/ui" element={<DevUIScreen />} />

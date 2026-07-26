@@ -12,6 +12,7 @@ import { puedeExportar } from '../../lib/permisos'
 import { AppCard, BrandLogo, Chip, ProgressRing, RolPill } from '../../components/ui'
 import { SalirButton } from '../../components/layout/SalirButton'
 import { AlertBell } from '../../components/layout/AlertBell'
+import { NavMenu } from '../../components/layout/NavMenu'
 
 export function InicioScreen() {
   const navigate = useNavigate()
@@ -84,6 +85,7 @@ export function InicioScreen() {
           </div>
           <div className="flex items-center gap-3">
             <AlertBell />
+            <NavMenu variant="inline" />
             <SalirButton />
           </div>
         </div>

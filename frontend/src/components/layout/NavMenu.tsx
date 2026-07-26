@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, X, Home, Warehouse, ListChecks, FileSpreadsheet, History, LogOut } from 'lucide-react'
+import { Menu, X, Home, Warehouse, ListChecks, FileSpreadsheet, History, LogOut, Users } from 'lucide-react'
 import { useSessionStore } from '../../store/useSessionStore'
 import { useCountingStore } from '../../store/useCountingStore'
 import { getProductosDeZona } from '../../data/mock/productos'
-import { puedeExportar } from '../../lib/permisos'
+import { puedeExportar, puedeGestionarUsuarios } from '../../lib/permisos'
 
 /**
  * Menú de navegación libre, disponible en todas las pantallas post-login.
@@ -89,6 +89,9 @@ export function NavMenu({ variant = 'inline' }: { variant?: 'inline' | 'floating
               label={puedeExportar(usuario) ? 'Reporte / Exportar' : 'Reporte'}
               onClick={() => ir('/reporte')}
             />
+            {puedeGestionarUsuarios(usuario) && (
+              <NavItem icon={<Users size={24} />} label="Gestión de usuarios" onClick={() => ir('/usuarios')} />
+            )}
 
             <div className="mt-auto">
               <button
