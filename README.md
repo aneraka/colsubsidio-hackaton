@@ -1,4 +1,16 @@
 # Colsubsidio — Inventario
+## Datos de prueba para el demo
+La app abre en `/login`. Usuarios de prueba (reales, contra Supabase — pestaña **PIN**, correo + PIN de
+6 dígitos):
+
+| Usuario | Correo | PIN | Rol |
+|---|---|---|---|
+| Juan P. | juan.perez@colsubsidio.com | `123456` | Operario |
+| Sandra M. | sandra.martinez@colsubsidio.com | `234567` | Operario |
+| Viviana R. | viviana.rojas@colsubsidio.com | `345678` | Admin |
+| Admin | admin@colsubsidio.com | `456789` | Super admin |
+| Roberto Díaz | lider.piscilago@colsubsidio.com | `567890` | Líder |
+
 
 Este repo aloja el sistema de inventario de Colsubsidio (Piscilago). Layout actual:
 
