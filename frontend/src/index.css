@@ -1,0 +1,95 @@
+@import 'tailwindcss';
+@import './styles/tokens.css';
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-graphite);
+  font-family: var(--font-sans);
+  font-size: 18px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* táctil para guantes */
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+/* La UI de conteo no debe permitir selección accidental de texto */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Transición suave de navegación entre pantallas */
+@keyframes fade-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.screen-enter {
+  animation: fade-slide-in 150ms ease-out;
+}
+
+/* Pop del número gigante al cambiar de valor */
+@keyframes number-pop {
+  0% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.number-pop {
+  animation: number-pop 150ms ease-out;
+}
+
+/* Ondas del micrófono escuchando */
+@keyframes mic-wave {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+/* Shake para PIN incorrecto */
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-8px);
+  }
+  40%,
+  80% {
+    transform: translateX(8px);
+  }
+}
+
+.shake {
+  animation: shake 400ms ease-in-out;
+}

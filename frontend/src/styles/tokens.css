@@ -1,0 +1,65 @@
+/* ============================================================
+   Tokens de marca Colsubsidio — Agente de Inventario
+   Fuente: manual de marca (3. Marca / Colores Oficiales.png).
+   Amarillo Pantone 109C #FFD000 · Azul Pantone 2196C #0067B1 ·
+   Grafito Cool Gray 11C #575756. Coinciden con CLAUDE.md.
+   ============================================================ */
+
+:root {
+  /* Paleta base */
+  --color-brand-yellow: #ffd000;
+  --color-brand-yellow-80: #ffda33;
+  --color-brand-yellow-soft: #fff2b8;
+  --color-brand-blue: #0067b1;
+  --color-brand-blue-60: #4d94c9;
+  --color-brand-blue-soft: #e5f0f8; /* azul ~12% para héroes */
+  --color-graphite: #575756;
+  --color-graphite-60: #8a8a89;
+  --color-bg: #f4f5f7;
+  --color-white: #ffffff;
+  --color-success: #2e9e5b;
+  --color-warning: #f5a623;
+  --color-warning-bg: #fff6e5;
+  --color-danger: #e23b3b;
+  --color-camera: #1e1e1e;
+
+  /* Sombra suave estándar de tarjetas (flat design) */
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Mapeo a utilidades Tailwind v4 (bg-brand-yellow, text-graphite, etc.) */
+@theme {
+  --color-brand-yellow: #ffd000;
+  --color-brand-yellow-80: #ffda33;
+  --color-brand-yellow-soft: #fff2b8;
+  --color-brand-blue: #0067b1;
+  --color-brand-blue-60: #4d94c9;
+  --color-brand-blue-soft: #e5f0f8;
+  --color-graphite: #575756;
+  --color-graphite-60: #8a8a89;
+  --color-bg: #f4f5f7;
+  --color-success: #2e9e5b;
+  --color-warning: #f5a623;
+  --color-warning-bg: #fff6e5;
+  --color-danger: #e23b3b;
+  --color-camera: #1e1e1e;
+
+  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  /* Escala tipográfica tablet */
+  --text-giant: clamp(120px, 30vh, 240px);
+  --text-giant--line-height: 0.9;
+  --text-giant--font-weight: 900;
+  --text-display: clamp(40px, 6vw, 68px);
+  --text-display--line-height: 1.05;
+  --text-display--font-weight: 800;
+  --text-title: clamp(24px, 3.2vw, 34px);
+  --text-title--line-height: 1.15;
+  --text-title--font-weight: 700;
+  --text-body-lg: 20px;
+  --text-body-lg--line-height: 1.4;
+
+  --radius-card: 22px;
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
